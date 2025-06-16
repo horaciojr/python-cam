@@ -9,7 +9,7 @@ import string  # <- novo
 
 # Verificar argumento
 if len(sys.argv) < 2:
-    print("❗ Por favor, forneça um argumento: 'pneu' ou 'amoreiras'.")
+    print("❗ Por favor, forneça um argumento")
     sys.exit(1)
 
 argumento = sys.argv[1].lower()
@@ -17,11 +17,14 @@ argumento = sys.argv[1].lower()
 # Mapear os argumentos para as URLs corretas
 streams = {
     'pneu': 'rtsp://admin:saveiro85@campinasmiamipneus.ddns.net',
-    'amoreiras': 'rtsp://admin:saveiro85@camvampinasvistoria.ddns.net'
+    'amoreiras': 'rtsp://admin:saveiro85@camvampinasvistoria.ddns.net',
+    'garagein': 'rtsp://admin:saveiro85@campinasmiamipneus.ddns.net',  # substitua pela URL real
+    'quiosque': 'rtmp://localizaplaca.com.br/live/cam1'
+
 }
 
 if argumento not in streams:
-    print(f"❌ Argumento inválido: '{argumento}'. Use apenas 'pneu' ou 'amoreiras'.")
+    print(f"❌ Argumento inválido: '{argumento}'. Use apenas: {', '.join(streams.keys())}.")
     sys.exit(1)
 
 # Seleciona a URL correspondente
@@ -37,62 +40,51 @@ try:
     while True:
         now = datetime.datetime.now()
         hour = now.hour
+        gravar = False  # Segurança, inicializando com valor conhecido.
 
-        if 6 <= hour <= 23:
+        if argumento in ('quiosque', 'garagein'):
+            gravar = True  # Grava 24 horas
+        elif argumento in ('pneu', 'amoreiras'):
+            gravar = 6 <= hour <= 18  # Grava apenas das 6h às 18h
+        else:
+            gravar = False  # Segurança, caso algo estranho entre
+
+        if gravar:
+        
             print("⏳ Dentro do horário de gravação. Iniciando novo vídeo...")
 
             timestamp = now.strftime("%Y%m%d_%H%M%S")
-            random_tag = ''.join(random.choices(string.ascii_lowercase + string.digits, k=4))  # <- novo
-            temp_video_file = f'captura_temp_{timestamp}_{random_tag}.mp4'  # <- novo
-
-            base_final_name = f'captura_video_{argumento}_{timestamp}.mp4'
-            final_video_file = base_final_name
+            final_video_file = f'captura_video_{argumento.replace(" ", "_")}_{timestamp}.mp4'
             destino = os.path.join(video_dir, final_video_file)
+            tmp = os.path.join(video_dir, 'tmp.mp4')
 
-            # Evita sobrescrita de arquivos existentes
-            ext_counter = 1
-            while os.path.exists(destino):
-                final_video_file = f'captura_video_{argumento}_{timestamp}__ext{ext_counter}.mp4'
-                destino = os.path.join(video_dir, final_video_file)
-                ext_counter += 1
 
             command = [
                 'ffmpeg',
                 '-rtsp_transport', 'tcp',
-                '-analyzeduration', '100M',
-                '-probesize', '100M',
-                '-fflags', 'nobuffer',
                 '-i', stream_url,
                 '-r', '30',
-                '-vf', 'scale=1920:1080',
-                '-b:v', '8000k',
-                '-crf', '15',
-                '-preset', 'fast',
+                '-c:v', 'libx264',
+                '-b:v', '6000k',
+                '-crf', '20',
+                '-preset', 'veryfast',
                 '-tune', 'zerolatency',
-                '-threads', '8',
-                '-rtbufsize', '2G',
+                '-threads', '4',
                 '-t', '30',
-                temp_video_file
+                tmp
             ]
 
-            print(f"🎬 Gravando: {temp_video_file}")
+            print(f"🎬 Gravando: {destino}")
             try:
-                process = subprocess.Popen(command)
-                process.wait()
-
-                if os.path.exists(temp_video_file):
-                    shutil.move(temp_video_file, destino)
-                    print(f"✅ Vídeo salvo: {destino}")
-                else:
-                    print("❌ Vídeo não foi gerado. Falha de captura ou stream offline.")
-
-            except Exception as e:
-                print(f"❗ Erro durante a gravação: {e}")
+                subprocess.run(command, check=True, timeout=35)
+                os.rename(tmp, destino)
+            except subprocess.TimeoutExpired:
+                print("⏱️ Tempo limite de execução atingido (35s).")
+            except subprocess.CalledProcessError as e:
+                print(f"❌ Erro ao executar o ffmpeg: {e}")
         else:
             print("🌙 Fora do horário de gravação. Aguardando horário permitido...")
             time.sleep(60)
-
-        time.sleep(1)
 
 except KeyboardInterrupt:
     print("🛑 Captura encerrada pelo usuário (CTRL+C).")

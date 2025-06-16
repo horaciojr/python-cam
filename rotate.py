@@ -4,13 +4,17 @@ import cv2
 import time
 import shutil
 
+# Verificar se argumento foi passado
 if len(sys.argv) < 2:
-    print("❗ Por favor, forneça um argumento: 'amoreiras' ou 'pneu'.")
+    print("❗ Por favor, forneça um argumento.")
     sys.exit(1)
 
+# Argumento passado
 argumento = sys.argv[1].lower()
-if argumento not in ['pneu', 'amoreiras']:
-    print("❗ Argumento inválido. Use 'amoreiras' ou 'pneu'.")
+
+# Verifica se é um valor permitido
+if argumento not in ['pneu', 'amoreiras', 'garagein']:
+    print(f"❌ Argumento inválido: '{argumento}'. Use apenas 'pneu',  'amoreiras' ou 'garagein'.")
     sys.exit(1)
 
 foto_dir = os.path.join('fotos', argumento, 'veiculos_detectados')
@@ -43,7 +47,7 @@ while True:
 
         (h, w) = image.shape[:2]
         center = (w // 2, h // 2)
-        rotation_matrix = cv2.getRotationMatrix2D(center, 15, 1.0)  # Rotação 15 graus para esquerda
+        rotation_matrix = cv2.getRotationMatrix2D(center, 14, 1.0)  # Rotação 15 graus para esquerda
         rotated_image = cv2.warpAffine(image, rotation_matrix, (w, h))
 
         save_path = os.path.join(salvar_dir, file_name)

@@ -5,16 +5,21 @@ import shutil
 import time
 from ultralytics import YOLO
 
-# Verifica se argumento foi passado na linha de comando
+# Verificar se argumento foi passado
 if len(sys.argv) < 2:
-    print("❗ Por favor, forneça o argumento: 'amoreiras' ou 'pneu'.")
+    print("❗ Por favor, forneça um argumento.")
     sys.exit(1)
 
-# Argumento recebido define o subdiretório a ser processado
-argumento = sys.argv[1]
+# Argumento passado
+argumento = sys.argv[1].lower()
+
+# Verifica se é um valor permitido
+if argumento not in ['pneu', 'amoreiras', 'garagein', 'quiosque', 'cerveja']:
+    print(f"❌ Argumento inválido: '{argumento}'. Use apenas 'pneu',  'amoreiras' , 'quiosque' ou 'cerveja'.")
+    sys.exit(1)
 
 # Carrega o modelo YOLO pré-treinado (versão nano)
-model = YOLO("yolov8n.pt")
+model = YOLO("modelos/yolov8n.pt")
 
 # Define os diretórios de entrada e saída com base no argumento
 input_dir = os.path.join("fotos", argumento)
@@ -51,7 +56,7 @@ while True:
             continue
 
         # Aplica o modelo YOLO na imagem
-        results = model(image)[0]
+        results = model(image, verbose=False)[0]
         vehicle_saved = False
 
         # Para cada detecção, verifica se é um veículo de interesse
@@ -68,14 +73,14 @@ while True:
 
                 # Salva a imagem do veículo detectado
                 cv2.imwrite(output_path, cropped_vehicle)
-                print(f"[✓] Veículo salvo: {new_filename}")
+                #print(f"[✓] Veículo salvo: {new_filename}")
                 vehicle_saved = True
 
         # Se nenhum veículo foi salvo, copia a imagem para a pasta de "sem_veiculos"
         if not vehicle_saved:
             dest_path = os.path.join(output_no_vehicle, filename)
             shutil.copy(image_path, dest_path)
-            print(f"[ ] Sem veículo válido: {filename}")
+            #print(f"[ ] Sem veículo válido: {filename}")
 
         # Remove a imagem original após o processamento
         os.remove(image_path)

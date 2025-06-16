@@ -1,0 +1,157 @@
+import os
+import sys
+import csv
+import mysql.connector
+from datetime import datetime
+import easyocr
+import shutil
+import time
+
+# Verificar se argumento foi passado
+if len(sys.argv) < 2:
+    print("❗ Por favor, forneça um argumento.")
+    sys.exit(1)
+
+# Argumento passado
+argumento = sys.argv[1].lower()
+
+# Verifica se é um valor permitido
+if argumento not in ['pneu', 'amoreiras', 'garagein', 'quiosque', 'cerveja']:
+    print(f"❌ Argumento inválido: '{argumento}'. Use apenas 'pneu',  'amoreiras' , 'quiosque' ou 'cerveja'.")
+    sys.exit(1)
+
+input_dir = os.path.join("fotos", argumento, "veiculos_detectados", "com_retangulos", "placa")
+os.makedirs(input_dir, exist_ok=True)
+
+output_dir = os.path.join(input_dir, "processada")
+os.makedirs(output_dir, exist_ok=True)
+
+
+# OCR
+reader = easyocr.Reader(['pt', 'en'], gpu=False)
+
+import datetime
+
+from datetime import datetime
+
+def extrair_info_imagem(nome_arquivo):
+    """
+    Extrai o nome da imagem original, a data e a hora a partir do nome do arquivo.
+    
+    Exemplo de nome: frame_captura_video_pneu_20250520_170201_1747771358_0037_vehicle_0_placa_0_bin.png
+    """
+    try:
+        partes = nome_arquivo.split("_")
+        data_str = partes[1]      # Ex: '20250520'
+        hora_str = partes[2]      # Ex: '170201'
+        
+        datahora = datetime.strptime(data_str + hora_str, "%Y%m%d%H%M%S%f")
+        return nome_arquivo, datahora.strftime("%Y-%m-%d %H:%M:%S")
+    
+    except (IndexError, ValueError) as e:
+        print(f"data_str '{data_str}'")
+        print(f"hora_str '{hora_str}'")
+        print(f"Erro ao extrair data/hora da imagem '{nome_arquivo}': {e}")
+        return nome_arquivo, None
+
+
+
+# Substituições
+def corrigir_para_letra(char):
+    return {
+        '0': 'O', '1': 'I', '2': 'Z', '3': 'E',
+        '4': 'A', '5': 'S', '6': 'G', '7': 'T',
+        '8': 'B', '9': 'P'
+    }.get(char.upper(), char.upper())
+
+def corrigir_para_numero(char):
+    return {
+        'O': '0', 'D': '0', 'Q': '0', 'U': '0',
+        'I': '1', 'L': '1',
+        'Z': '2', 'E': '3', 'S': '5',
+        'G': '6', 'T': '7', 'Y': '7', 'B': '8', 'P': '9'
+    }.get(char.upper(), char.upper())
+
+def normalizar_placa(texto):
+    texto = texto.strip().upper()
+    if len(texto) == 7:
+        corrigida = ""
+        for i, c in enumerate(texto):
+            if i in [0, 1, 2, 4]:
+                corrigida += corrigir_para_letra(c)
+            else:
+                corrigida += corrigir_para_numero(c)
+        return corrigida
+    elif len(texto) == 8:
+        parte_letras = texto[:3]
+        separador = texto[3]
+        parte_numeros = texto[4:]
+        if separador not in [' ', '-', ',', '.']:
+            return texto
+        letras_corrigidas = ''.join([corrigir_para_letra(c) for c in parte_letras])
+        numeros_corrigidos = ''.join([corrigir_para_numero(c) for c in parte_numeros])
+        return f"{letras_corrigidas}{separador}{numeros_corrigidos}"
+    return texto
+
+# Conexão MySQL
+try:
+    db = mysql.connector.connect(
+    host="localhost",
+    user="webdb",
+    password="webdb",
+    database="seguraplacas"
+    )
+    cursor = db.cursor()
+except mysql.connector.Error as err:
+    print(f"Erro na conexão com MySQL: {err}")
+    sys.exit(1)
+
+
+while True:
+
+    imagens_encontradas = False  # Inicializa como False
+
+    # Processamento
+    for filename in sorted(os.listdir(input_dir)):
+        if not filename.lower().endswith(".png"):
+            continue
+
+        imagens_encontradas = True  # Define como True se encontrar pelo menos uma imagem válida
+
+        filepath = os.path.join(input_dir, filename)
+        ocr_resultados = reader.readtext(filepath)
+
+        for bbox, texto_detectado, confianca in ocr_resultados:
+            texto_corrigido = normalizar_placa(texto_detectado)
+            texto_limpo = texto_corrigido.translate(str.maketrans('', '', '{}[]()'))
+
+            if len(texto_limpo) <= 6:
+                continue
+            else:
+                imagem, datahora = extrair_info_imagem(filename)
+
+                try:
+                    cursor.execute("""
+                        INSERT INTO placas_detectadas (imagem, original, corrigido, confianca, data, cam)
+                    VALUES (%s, %s, %s, %s, %s, %s)
+                """, (imagem, texto_detectado, texto_limpo, float(confianca),datahora, argumento))
+                except Exception as e:
+                    print(f"Erro ao inserir no banco: {e}")
+        try:
+            shutil.move(filepath, os.path.join(output_dir, filename))
+        except Exception as e:
+            print(f"⚠️ Erro ao mover {filepath} para {output_dir}: {e}")
+
+    # Se não houver imagens, espera 5 segundos antes de verificar novamente
+    if not imagens_encontradas:
+        print("⏳ Nenhuma imagem encontrada. Aguardando 5 segundos...")
+        time.sleep(5)
+
+
+db.commit()
+cursor.close()
+db.close()
+csv_file.close()
+
+print(f"✅ OCR finalizado para: {argumento}")
+print(f"📁 Placas inválidas salvas em: {csv_path}")

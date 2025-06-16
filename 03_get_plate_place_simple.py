@@ -1,5 +1,5 @@
 # Ignora certificados SSL antes de qualquer import que use requests
-import monkey_patch_requests
+#import monkey_patch_requests
 
 from ultralytics import YOLO
 import cv2
@@ -8,19 +8,24 @@ import shutil
 import sys
 import time
 
-# Verifica se argumento foi passado
+# Verificar se argumento foi passado
 if len(sys.argv) < 2:
-    print("❗ Por favor, forneça o argumento: 'amoreiras' ou 'pneu'.")
+    print("❗ Por favor, forneça um argumento.")
     sys.exit(1)
 
-# Argumento recebido
-argumento = sys.argv[1]
+# Argumento passado
+argumento = sys.argv[1].lower()
+
+# Verifica se é um valor permitido
+if argumento not in ['pneu', 'amoreiras', 'garagein', 'quiosque', 'cerveja']:
+    print(f"❌ Argumento inválido: '{argumento}'. Use apenas 'pneu',  'amoreiras' , 'quiosque' ou 'cerveja'.")
+    sys.exit(1)
 
 # Carrega o modelo YOLO localmente
 model = YOLO("modelos/license_plate_detector.pt")
 
 # Define as pastas
-input_dir = os.path.join("fotos", argumento, "veiculos_detectados", "15")
+input_dir = os.path.join("fotos", argumento, "veiculos_detectados")
 output_base = input_dir
 output_dir = os.path.join(output_base, "com_retangulos")
 placa_dir = os.path.join(output_dir, "placa")
@@ -49,7 +54,8 @@ while True:
         conf=0.3,
         save=False,
         save_crop=False,
-        stream=True
+        stream=True,
+        verbose=False
     )
 
     for result in results:
@@ -64,7 +70,7 @@ while True:
         name_no_ext, ext = os.path.splitext(filename)
 
         if ext.lower() != '.png':
-            print(f"[ ] Ignorado: {filename} (não é PNG)")
+            #print(f"[ ] Ignorado: {filename} (não é PNG)")
             continue
 
         num_placas = 0
@@ -89,6 +95,6 @@ while True:
 
         else:
             shutil.copy(img_path, os.path.join(sem_placa_dir, filename))
-            print(f"[ ] Nenhuma placa encontrada: {filename}")
+            #print(f"[ ] Nenhuma placa encontrada: {filename}")
 
         os.remove(img_path)

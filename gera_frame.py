@@ -6,15 +6,15 @@ import sys
 
 # Verificar se argumento foi passado
 if len(sys.argv) < 2:
-    print("❗ Por favor, forneça um argumento: 'pneu' ou 'amoreiras'.")
+    print("❗ Por favor, forneça um argumento.")
     sys.exit(1)
 
 # Argumento passado
 argumento = sys.argv[1].lower()
 
 # Verifica se é um valor permitido
-if argumento not in ['pneu', 'amoreiras']:
-    print(f"❌ Argumento inválido: '{argumento}'. Use apenas 'pneu' ou 'amoreiras'.")
+if argumento not in ['pneu', 'amoreiras', 'garagein']:
+    print(f"❌ Argumento inválido: '{argumento}'. Use apenas 'pneu',  'amoreiras' ou 'garagein'.")
     sys.exit(1)
 
 # Diretórios
@@ -42,6 +42,8 @@ while True:
             continue
         if not video_name.lower().endswith(('.mp4', '.mov', '.avi', '.mkv')):
             continue
+        if video_name.startswith('tmp'):
+            continue
 
         videos_encontrados = True
 
@@ -56,8 +58,8 @@ while True:
         command = [
             'ffmpeg',
             '-i', video_path,
-            '-vf', 'select=gt(scene\,0.05)',
-            '-fps_mode', 'vfr',
+            '-vf', 'select=gt(scene\,0.075)',
+            '-vsync', 'vfr',
             '-q:v', '1',  # Qualidade máxima
             frame_pattern
         ]
